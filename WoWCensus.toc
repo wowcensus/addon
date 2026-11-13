@@ -1,0 +1,15 @@
+## Interface: 120105, 120100, 120007, 50504, 38000, 20506, 16001, 11508, 11509
+## Title: WoWCensus
+## Notes: Census /who collection
+## Author: wowcensus
+## Version: 0.1.9
+## SavedVariables: WoWCensusDB
+## X-Category: Data Collection
+
+Core.lua
+Utils/Tables.lua
+Population/WhoScan.lua
+Population/CensusProfiles.lua
+Population/Census.lua
+Population/Passive.lua
+UI.lua

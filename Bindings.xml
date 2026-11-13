@@ -1,0 +1,4 @@
+<Bindings>
+    <Binding name="WOWCENSUS_TOGGLE" header="WOWCENSUS">WoWCensus.UI:Toggle()</Binding>
+    <Binding name="WOWCENSUS_NEXT" header="WOWCENSUS">WoWCensus.Population.Census:RunNext(false, "binding")</Binding>
+</Bindings>
