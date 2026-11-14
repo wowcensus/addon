@@ -12,6 +12,8 @@ local ZONE_SPLITS = 4
 local NAME_SPLITS = 16
 local LETTER_MAX_SHARE = 0.4
 local LETTER_COVERAGE = 0.98
+local PART_MAX = 2
+local FOREVER_PLAN = "forever-broad-v8"
 local MIN_ZONE_SUPPORT = 3
 local FIXED_SPLIT_AT = 40
 local MERGE_TARGET = 40
@@ -84,13 +86,42 @@ local function contains(have, want)
     return have ~= nil and tostring(have):lower():find(tostring(want):lower(), 1, true) ~= nil
 end
 
+local function splitPair(letter)
+    return tostring(letter or ""):match("^(%S+)%s+(%S+)$")
+end
+
+local function nameParts(c)
+    local first = tostring(c.firstName or ""):lower()
+    local last = tostring(c.lastName or ""):lower()
+    if first == "" then
+        local name = tostring(c.name or c.fullName or ""):lower():gsub("%-.*$", "")
+        first, last = name:match("^(%S+)%s+(.+)$")
+        first, last = first or name, last or ""
+    end
+    return first, last
+end
+
+local function pairCovers(first, last, f, l)
+    return first:find(f, 1, true) ~= nil and last:find(l, 1, true) ~= nil
+end
+
+local function matchesLetter(c, letter)
+    if not letter then return true end
+    local f, l = splitPair(letter)
+    if f then
+        local first, last = nameParts(c)
+        return pairCovers(first, last, f, l)
+    end
+    return tostring(c.name or c.fullName or ""):lower():find(letter, 1, true) ~= nil
+end
+
 local function matchesNode(c, n)
     local L = tonumber(c.level) or 0
     return L >= n.lo and L <= n.hi
         and (not n.class or c.classFile == n.class
             or (c.classFile and contains(P.ClassName(c.classFile), P.ClassName(n.class))))
         and (not n.race or contains(c.race, n.race))
-        and (not n.letter or tostring(c.name or c.fullName or ""):lower():find(n.letter, 1, true))
+        and matchesLetter(c, n.letter)
 end
 
 function C:Weight(n)
@@ -260,6 +291,110 @@ local function letterList(n, hist)
     return chosen
 end
 
+local function greedyPairs(people, candidates)
+    local pool = {}
+    for _, cand in ipairs(candidates) do
+        local hits = 0
+        for _, p in ipairs(people) do
+            if pairCovers(p.first, p.last, cand[1], cand[2]) then hits = hits + 1 end
+        end
+        if hits > 0 and hits <= #people * LETTER_MAX_SHARE then pool[#pool + 1] = cand end
+    end
+    local chosen, covered, nCovered = {}, {}, 0
+    while #chosen < NAME_SPLITS and #pool > 0 and nCovered < #people * LETTER_COVERAGE do
+        local bestIndex, bestGain = 1, 0
+        for i, cand in ipairs(pool) do
+            local gain = 0
+            for j, p in ipairs(people) do
+                if not covered[j] and pairCovers(p.first, p.last, cand[1], cand[2]) then gain = gain + 1 end
+            end
+            if gain > bestGain then bestIndex, bestGain = i, gain end
+        end
+        if bestGain == 0 then break end
+        local cand = table.remove(pool, bestIndex)
+        chosen[#chosen + 1] = cand
+        for j, p in ipairs(people) do
+            if not covered[j] and pairCovers(p.first, p.last, cand[1], cand[2]) then
+                covered[j] = true
+                nCovered = nCovered + 1
+            end
+        end
+    end
+    return chosen
+end
+
+local function grow(part, names)
+    local seen, out = {}, {}
+    for _, name in ipairs(names) do
+        for i = 1, #name - 1 do
+            local gram = name:sub(i, i + 1)
+            if gram:match("^%a%a$") and gram:find(part, 1, true) and not seen[gram] then
+                seen[gram] = true
+                out[#out + 1] = gram
+            end
+        end
+    end
+    if #out == 0 then
+        for v in ("aeiou"):gmatch(".") do out[#out + 1] = part .. v end
+    end
+    return out
+end
+
+local function pairList(n, hist)
+    local probe = { lo = 1, hi = math.huge, class = n.class, race = n.race, letter = n.letter }
+    local people = {}
+    for _, c in ipairs(hist.recent or {}) do
+        if matchesNode(c, probe) then
+            local first, last = nameParts(c)
+            if first ~= "" and last ~= "" then people[#people + 1] = { first = first, last = last } end
+        end
+    end
+    local f, l = splitPair(n.letter)
+    local options = {}
+    if not f then
+        local anchor = tostring(n.letter)
+        local cands = {}
+        for x in ("aeinorstludmchpgbyfkvwxqjz"):gmatch(".") do
+            cands[#cands + 1] = { anchor, x }
+            if x ~= anchor then cands[#cands + 1] = { x, anchor } end
+        end
+        options[1] = cands
+    else
+        local firsts, lasts = {}, {}
+        for _, p in ipairs(people) do
+            firsts[#firsts + 1] = p.first
+            lasts[#lasts + 1] = p.last
+        end
+        local function side(growFirst)
+            local cands = {}
+            if growFirst and #f < PART_MAX then
+                for _, g in ipairs(grow(f, firsts)) do cands[#cands + 1] = { g, l } end
+            elseif not growFirst and #l < PART_MAX then
+                for _, g in ipairs(grow(l, lasts)) do cands[#cands + 1] = { f, g } end
+            end
+            return cands
+        end
+        local firstShorter = #f <= #l
+        options[1] = side(firstShorter)
+        options[2] = side(not firstShorter)
+    end
+    for _, cands in ipairs(options) do
+        local chosen
+        if #people == 0 then
+            chosen = {}
+            for i = 1, math.min(#cands, 10) do chosen[i] = cands[i] end
+        else
+            chosen = greedyPairs(people, cands)
+        end
+        if #chosen >= 2 then
+            local out = {}
+            for i, cand in ipairs(chosen) do out[i] = cand[1] .. " " .. cand[2] end
+            return out
+        end
+    end
+    return {}
+end
+
 function C:Learned(n)
     local _, store = self:State()
     local e = store.censusLearned[nodeKey(n)]
@@ -273,6 +408,8 @@ function C:SplitKind(n, st)
         if not n.race then return "race" end
         if not n.class then return "class" end
         if not n.letter then return "letter" end
+        local f, l = splitPair(n.letter)
+        if not f or #f < PART_MAX or #l < PART_MAX then return "namepair" end
         return nil
     end
     local learned = self:Learned(n)
@@ -391,6 +528,12 @@ function C:Children(n, st)
         for _, letter in ipairs(letterList(n, self:History())) do
             kids[#kids + 1] = { lo = n.lo, hi = n.hi, class = n.class, race = n.race,
                 letter = letter, zone = n.zone }
+        end
+        return kids, false, kind
+    elseif kind == "namepair" then
+        for _, pair in ipairs(pairList(n, self:History())) do
+            kids[#kids + 1] = { lo = n.lo, hi = n.hi, class = n.class, race = n.race,
+                letter = pair, zone = n.zone }
         end
         return kids, false, kind
     elseif kind == "zone" then
@@ -562,7 +705,7 @@ function C:Outdated()
     local st = self:State()
     local prof = self:Profile()
     return st and prof and
-        ((prof.id == "forever" and st.plan ~= "forever-broad-v6")
+        ((prof.id == "forever" and st.plan ~= FOREVER_PLAN)
             or (prof.id == "retail" and not st.fixed and st.plan ~= "retail-broad-first-v1")
             or (prof.id == "hardcore" and not st.fixed and st.plan ~= "hardcore-broad-first-v1")
             or (prof.id == "mop-classic" and not st.fixed and st.plan ~= "mop-broad-first-v1")) or false
@@ -584,6 +727,42 @@ end
 function C:ForeverProbe(st, prof)
     if st.activeLevel >= prof.maxLevel then return nil end
     return { refreshFilter = (st.activeLevel + 1) .. "-" .. prof.maxLevel, probe = true }
+end
+
+function C:MaxProbeNode(st, from)
+    local hi = st.maxProbe.hi
+    return { refreshFilter = from == hi and tostring(hi) or (from .. "-" .. hi),
+        maxProbe = true, probeFrom = from }
+end
+
+function C:BeginForeverBands(st, prof, maxLevel)
+    st.maxProbe = nil
+    st.activeLevel = maxLevel
+    local _, store = self:State()
+    store.foreverDiscoveredLevel = maxLevel
+    local nodes = self:ForeverMixedPlan(prof, prof.minLevel, maxLevel)
+    for _, node in ipairs(nodes) do st.queue[#st.queue + 1] = node end
+    st.baseRemaining = #nodes
+    st.refinements = {}
+    st.nextProbeAt = st.done + 25
+    ML:Print("Highest level online is %d. Queued %d level bands from %d-%d; race, class, letter and first/last name splits follow.",
+        maxLevel, #nodes, prof.minLevel or 1, maxLevel)
+end
+
+function C:OnMaxProbe(st, prof, n, sample)
+    local probe = st.maxProbe
+    local observed = sample.observed or 0
+    if observed == 0 then
+        probe.hi = n.probeFrom - 1
+    else
+        probe.lo = math.max(probe.lo, n.probeFrom, sample.maxObservedLevel or 0)
+        if not Pop:IsCapped(observed) then probe.hi = probe.lo end
+    end
+    if probe.lo >= probe.hi then
+        self:BeginForeverBands(st, prof, probe.lo)
+    else
+        table.insert(st.queue, 1, self:MaxProbeNode(st, math.floor((probe.lo + 1 + probe.hi + 1) / 2)))
+    end
 end
 
 function C:ExpandForever(st, prof, level)
@@ -652,13 +831,10 @@ function C:Start()
     local adaptivePassive = ML.db.settings.censusPassive
     if prof.id == "forever" then
 
-        st.plan, st.fixed = "forever-broad-v6", false
+        st.plan, st.fixed = FOREVER_PLAN, false
         st.ratioObs, st.ratioHist = 0, 0
-        st.activeLevel = math.min(prof.maxLevel, math.max(30, store.foreverDiscoveredLevel or 30))
-        st.nextProbeAt = 25
-        backbone = self:ForeverMixedPlan(prof, prof.minLevel, st.activeLevel)
-        st.baseRemaining = #backbone
-        st.refinements = {}
+        local own = math.max(tonumber(UnitLevel and UnitLevel("player")) or 1, prof.minLevel or 1)
+        st.maxProbe = { lo = math.min(own, prof.maxLevel), hi = prof.maxLevel }
     elseif prof.simpleRefresh and not adaptivePassive then
 
         for level = 1, math.min(prof.maxLevel, 20) do
@@ -682,10 +858,12 @@ function C:Start()
             end
         end
     end
-    if st.plan == "forever-broad-v6" then
-        for _, n in ipairs(backbone) do st.queue[#st.queue + 1] = n end
-        local probe = self:ForeverProbe(st, prof)
-        if probe then st.queue[#st.queue + 1] = probe end
+    if st.plan == FOREVER_PLAN then
+        if st.maxProbe.lo >= st.maxProbe.hi then
+            self:BeginForeverBands(st, prof, st.maxProbe.lo)
+        else
+            st.queue[1] = self:MaxProbeNode(st, st.maxProbe.lo + 1)
+        end
     elseif st.plan == "mop-broad-first-v1" then
 
         for _, n in ipairs(backbone) do st.queue[#st.queue + 1] = n end
@@ -693,9 +871,9 @@ function C:Start()
         self:Enqueue(backbone, st)
     end
     if st.fixed then st.ratioObs, st.ratioHist = 0, 0 end
-    if st.plan == "forever-broad-v6" then
-        ML:Print("Census started: |cffffffff%s|r %s, levels 10-%d in order, then %d shuffled level/race and level/class queries across levels 1-%d. Name refinements follow the base sweep.",
-            prof.label, prof.faction, math.min(30, prof.maxLevel), #backbone, prof.maxLevel)
+    if st.plan == FOREVER_PLAN then
+        ML:Print("Census started: |cffffffff%s|r %s. Finding the highest level online first, then drilling down by level, race, class, name letter and first/last name pairs.",
+            prof.label, prof.faction)
     else
         ML:Print("Census started: |cffffffff%s|r %s, %s%d queries%s.",
             prof.label, prof.faction, st.fixed and "fixed list of " or "", #st.queue,
@@ -741,7 +919,7 @@ function C:Settle(st, quiet)
         end
     end
 
-    if prof.id == "retail" then
+    if prof.racesByClass and (prof.id == "retail" or prof.id == "forever") then
         for i = #st.queue, 1, -1 do
             local n = st.queue[i]
             local allowed = n.class and n.race and prof.racesByClass[n.class]
@@ -883,7 +1061,7 @@ function C:OnScanComplete(sample, tag)
         if not n.refreshFilter then kids, exhaustive, kind = self:Children(n, st) end
         if exhaustive then
             self:Learn(n, kind, kids)
-        elseif not (n.refreshFilter and st.plan == "forever-broad-v6")
+        elseif not (n.refreshFilter and st.plan == FOREVER_PLAN)
             and not n.zone and not n.letter then
             st.unresolved = st.unresolved + 1
         end
@@ -892,7 +1070,7 @@ function C:OnScanComplete(sample, tag)
             if exhaustive then st.unresolved = st.unresolved + 1 end
             kids = {}
         end
-        if st.plan == "forever-broad-v6" and (n.base or (st.baseRemaining or 0) > 0) then
+        if st.plan == FOREVER_PLAN and (n.base or (st.baseRemaining or 0) > 0) then
             for _, kid in ipairs(kids) do st.refinements[#st.refinements + 1] = kid end
             last.split = #kids
         else
@@ -910,7 +1088,7 @@ function C:OnScanComplete(sample, tag)
         store.censusLearned[key] = nil
         if not n.zone then store.censusSeen[key] = { t = time(), n = observed } end
 
-        if not n.zone then
+        if not n.zone and not n.refreshFilter then
             local raw = self:Weight(n)
             if raw > 0 then
                 st.ratioObs = st.ratioObs + observed
@@ -926,7 +1104,9 @@ function C:OnScanComplete(sample, tag)
             st.refinements = nil
         end
     end
-    if st.plan == "forever-broad-v6" then
+    if n.maxProbe and st.maxProbe then
+        self:OnMaxProbe(st, self:Profile(), n, sample)
+    elseif st.plan == FOREVER_PLAN and st.activeLevel then
         local prof = self:Profile()
         local found = sample.maxObservedLevel or 0
         if found > st.activeLevel then

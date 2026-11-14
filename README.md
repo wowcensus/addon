@@ -14,9 +14,23 @@ It works on Retail, Classic Era, Season of Discovery, TBC Anniversary, MoP Class
 
 Just play. The add-on starts on its own when you log in, and moves forward a step each time you walk or click in the game world. WoW only allows `/who` after real player input, so it can't run by itself while you're idle.
 
-- `/wc` opens the window and shows progress.
+- `/wc` or the minimap button opens the window and shows progress.
 - If it asks for your region, type `/wc region us`. Use `eu`, `kr`, `tw` or `cn` if that's your region.
-- **Auto: On / Off** in the window pauses or resumes it.
+- **Auto: On / Off** in the window pauses or resumes it. Right-clicking the minimap button does the same.
+- `/wc minimap` shows or hides the minimap button.
+
+## Other add-on data (optional)
+
+WoWCensus can also copy what some popular add-ons already record about your own play, so wowcensus.io can show things like how long items take to sell. This is **off by default**. Turn it on with the **Collect other addon data** box in the window, or `/wc market on` (`/wc market off` turns it off again).
+
+When it's on, WoWCensus copies from whichever of these you have installed:
+
+- **Journalator**: your auction posts, sales, purchases, expired and cancelled auctions, vendor buys and sells, repairs, quests, loot, flight paths, trainer costs, mail and trades.
+- **TradeSkillMaster**: your auction sales, purchases, expired and cancelled auctions.
+- **Auctionator**: your posting history.
+- **Dungeon Journal**: everything it saves, such as dungeon runs, kills and the quest text it has learned.
+
+Other players' names, mail subjects and mail text are never copied. Only the last 90 days are kept. If none of these add-ons are installed, nothing happens.
 
 ## Share your results
 

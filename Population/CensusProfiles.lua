@@ -17,6 +17,18 @@ local VANILLA_RACES_BY_CLASS = {
     DRUID   = { "Night Elf", "Tauren" },
 }
 
+local FOREVER_RACES_BY_CLASS = {
+    WARRIOR = { "Human", "Dwarf", "Night Elf", "Gnome", "High Order Skyborne", "Orc", "Undead", "Tauren", "Troll", "Windshaper Skyborne" },
+    PALADIN = { "Human", "Dwarf", "Undead" },
+    HUNTER  = { "Human", "Dwarf", "Night Elf", "High Order Skyborne", "Orc", "Tauren", "Troll", "Windshaper Skyborne" },
+    ROGUE   = { "Human", "Dwarf", "Night Elf", "Gnome", "High Order Skyborne", "Orc", "Undead", "Troll", "Windshaper Skyborne" },
+    PRIEST  = { "Human", "Dwarf", "Night Elf", "Gnome", "Undead", "Troll" },
+    SHAMAN  = { "Dwarf", "Orc", "Tauren", "Troll", "Windshaper Skyborne" },
+    MAGE    = { "Human", "Gnome", "High Order Skyborne", "Orc", "Undead", "Troll" },
+    WARLOCK = { "Human", "Gnome", "Orc", "Undead", "Troll" },
+    DRUID   = { "Night Elf", "High Order Skyborne", "Tauren", "Windshaper Skyborne" },
+}
+
 local TBC_RACES_BY_CLASS = {}
 
 local RETAIL_RACES_BY_CLASS = {
@@ -159,6 +171,7 @@ P.profiles = {
             Alliance = { "Human", "Dwarf", "Night Elf", "Gnome", "High Order Skyborne" },
             Horde    = { "Orc", "Undead", "Tauren", "Troll", "Windshaper Skyborne" },
         },
+        racesByClass = FOREVER_RACES_BY_CLASS,
         hotspots = {
             Alliance = { "Stormwind City", "Ironforge", "Elwynn Forest", "Dun Morogh", "Teldrassil" },
             Horde    = { "Orgrimmar", "Undercity", "Durotar", "Tirisfal Glades", "Mulgore", "The Barrens" },

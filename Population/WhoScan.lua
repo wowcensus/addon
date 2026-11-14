@@ -374,14 +374,17 @@ function Pop:Capture()
         elapsedMs = elapsedMs, shown = shown, total = total })
 
     local classes, races, roster = {}, {}, {}
+    local maxLevel = 0
     local observed = 0
     for i = 1, shown do
         local info = whoInfo(i)
         if info then
             local token = info.filename or info.classStr or "UNKNOWN"
             local race  = info.raceStr or "Unknown"
+            local level = tonumber(info.level) or 0
             classes[token] = (classes[token] or 0) + 1
             races[race]    = (races[race] or 0) + 1
+            if level > maxLevel then maxLevel = level end
             observed = observed + 1
             local key, fullName, name, realm, firstName, lastName = identity(info)
             if key and not roster[key] then
@@ -404,6 +407,7 @@ function Pop:Capture()
         total    = total or observed,
         classes  = classes,
         races    = races,
+        maxObservedLevel = maxLevel,
     }
     local stale = staleReason(self.pendingFilter, roster, observed)
     if stale then
@@ -655,6 +659,7 @@ function Pop:Record(sample, roster)
     local unique = 0
     for key, seen in pairs(roster or {}) do
         unique = unique + 1
+        self:RememberSession(key)
         local c = store.characters[key]
         if not c then
             c = { key = key, firstSeen = sample.t, seenCount = 0, days = {} }
@@ -891,6 +896,19 @@ function Pop:RepairForeverKeys()
     return fixed
 end
 
-function Pop:Init()
+function Pop:RememberSession(key)
+    if not key or key == "" then return end
+    self.sessionSeen = self.sessionSeen or {}
+    if self.sessionSeen[key] then return end
+    self.sessionSeen[key] = true
+    self.sessionCount = (self.sessionCount or 0) + 1
+end
 
+function Pop:SessionCount()
+    return self.sessionCount or 0
+end
+
+function Pop:Init()
+    self.sessionSeen = {}
+    self.sessionCount = 0
 end

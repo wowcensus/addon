@@ -168,6 +168,12 @@ SlashCmdList.WOWCENSUS = function(input)
         WC.db.settings.censusAutoStart = command == "auto on"
         WC.db.settings.censusAutoStartConfigured = true
         WC:Print("Start at login %s.", WC.db.settings.censusAutoStart and "on" or "off")
+    elseif command == "market on" or command == "market off" then
+        WC.Market:SetEnabled(command == "market on")
+    elseif command == "minimap" then
+        local shown = WC.db.minimap and WC.db.minimap.hide
+        WC:SetMinimapShown(shown and true or false)
+        WC:Print("Minimap button %s.", (WC.db.minimap and WC.db.minimap.hide) and "hidden" or "shown")
     elseif command == "debug" then
         WC.db.settings.debug = not WC.db.settings.debug
         WC:Print("Debug %s.", WC.db.settings.debug and "on" or "off")
