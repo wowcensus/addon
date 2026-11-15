@@ -16,6 +16,11 @@ local function retailAvailable()
         and C_ChatInfo and type(C_ChatInfo.GetChannelRosterInfo) == "function"
 end
 
+local function enabled()
+    return retailAvailable() and WC.db and WC.db.settings
+        and WC.db.settings.channelRosterEnabled ~= false
+end
+
 local function rosterStore()
     local store = Pop:Store()
     store.channelRoster = store.channelRoster or { samples = {}, characters = {} }
@@ -65,9 +70,13 @@ function ChannelRoster:Scan(announce)
         if announce then WC:Print("Channel roster collection is available on Retail only.") end
         return 0
     end
+    if not enabled() then
+        if announce then WC:Print("Channel roster collection is off. Use |cffffff00/wc roster on|r to enable it.") end
+        return 0
+    end
 
     local timestamp = time()
-    local discovered, stats = {}, {}
+    local discovered, stats, diagnostics = {}, {}, {}
     for displayIndex = 1, (GetNumDisplayChannels() or 0) do
         local channelName, isHeader, _, channelNumber, memberCount, active =
             GetChannelDisplayInfo(displayIndex)
@@ -75,7 +84,7 @@ function ChannelRoster:Scan(announce)
             local collected = 0
             for memberIndex = 1, memberCount do
                 local playerName, _, _, guid =
-                    C_ChatInfo.GetChannelRosterInfo(channelNumber, memberIndex)
+                    C_ChatInfo.GetChannelRosterInfo(displayIndex, memberIndex)
                 if playerName and playerName ~= "" then
                     local key, fullName, name, realm, firstName, lastName =
                         Pop:CharacterIdentity({ fullName = playerName })
@@ -95,7 +104,14 @@ function ChannelRoster:Scan(announce)
                     end
                 end
             end
-            stats[channelName or tostring(channelNumber)] = collected
+            local channelKey = channelName or tostring(channelNumber)
+            if collected > 0 then stats[channelKey] = collected end
+            if collected < memberCount then
+                diagnostics[channelKey] = {
+                    reported = memberCount, collected = collected,
+                    displayIndex = displayIndex, channelNumber = channelNumber,
+                }
+            end
         end
     end
 
@@ -106,27 +122,44 @@ function ChannelRoster:Scan(announce)
     end
 
     local source = rosterStore()
-    source.samples[#source.samples + 1] = { t = timestamp, unique = unique, channels = stats }
+    source.samples[#source.samples + 1] = {
+        t = timestamp, unique = unique, channels = stats, diagnostics = diagnostics,
+    }
     while #source.samples > SAMPLE_CAP do table.remove(source.samples, 1) end
     source.lastScan = timestamp
     local retention = (WC.db.settings and WC.db.settings.populationRetentionDays) or 35
     local cutoff = timestamp - retention * 86400
+    local characters = Pop:Store().characters
     for key, character in pairs(source.characters) do
-        if (character.lastSeen or 0) < cutoff then source.characters[key] = nil end
+        if (character.lastSeen or 0) < cutoff then
+            source.characters[key] = nil
+            local canonical = characters[key]
+            if canonical and (canonical.seenCount or 0) == 0 then
+                characters[key] = nil
+            end
+        end
     end
 
     if announce then
         for channel, count in pairs(stats) do WC:Print("%s: %d channel member(s).", channel, count) end
+        for channel, result in pairs(diagnostics) do
+            WC:Print("|cffff8040%s roster incomplete: retrieved %d of %d reported member(s).|r",
+                channel, result.collected, result.reported)
+        end
         WC:Print("Channel rosters found %d unique character(s).", unique)
     else
         WC:Debug("Channel rosters found %d unique character(s).", unique)
+        for channel, result in pairs(diagnostics) do
+            WC:Debug("%s roster incomplete: retrieved %d of %d.",
+                channel, result.collected, result.reported)
+        end
     end
     WC:Fire("CHANNEL_ROSTER_SCAN_COMPLETE", source.samples[#source.samples])
     return unique
 end
 
 function ChannelRoster:Schedule(delay)
-    if not retailAvailable() or not C_Timer or not C_Timer.After then return end
+    if not enabled() or not C_Timer or not C_Timer.After then return end
     self.scheduleGeneration = (self.scheduleGeneration or 0) + 1
     local generation = self.scheduleGeneration
     C_Timer.After(delay or RESCAN_DELAY, function()
@@ -141,10 +174,28 @@ function ChannelRoster:Init()
     events:RegisterEvent("CHANNEL_UI_UPDATE")
     events:SetScript("OnEvent", function() ChannelRoster:Schedule(RESCAN_DELAY) end)
     self.eventFrame = events
-    self:Schedule(INITIAL_DELAY)
-    if C_Timer and C_Timer.NewTicker then
+    if enabled() then self:Schedule(INITIAL_DELAY) end
+    if enabled() and C_Timer and C_Timer.NewTicker then
         self.ticker = C_Timer.NewTicker(SCAN_INTERVAL, function() ChannelRoster:Scan(false) end)
     end
+end
+
+function ChannelRoster:SetEnabled(on)
+    if not retailAvailable() then
+        WC:Print("Channel roster collection is available on Retail only.")
+        return
+    end
+    WC.db.settings.channelRosterEnabled = on and true or false
+    self.scheduleGeneration = (self.scheduleGeneration or 0) + 1
+    if self.ticker and self.ticker.Cancel then self.ticker:Cancel() end
+    self.ticker = nil
+    if on then
+        self:Schedule(0)
+        if C_Timer and C_Timer.NewTicker then
+            self.ticker = C_Timer.NewTicker(SCAN_INTERVAL, function() ChannelRoster:Scan(false) end)
+        end
+    end
+    WC:Print("Channel roster collection %s.", on and "on" or "off")
 end
 
 SLASH_WOWCENSUSROSTER1 = "/wcroster"

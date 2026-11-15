@@ -104,7 +104,7 @@ function WC:InitDB()
     self.db.settings = self.db.settings or {}
     local defaults = {
         populationRetentionDays = 35,
-        censusFixed = false, debug = false,
+        censusFixed = false, debug = false, channelRosterEnabled = true,
     }
     for key, value in pairs(defaults) do
         if self.db.settings[key] == nil then self.db.settings[key] = value end
@@ -158,6 +158,8 @@ SlashCmdList.WOWCENSUS = function(input)
     elseif command == "status" then census:Status()
     elseif command == "diag" then WC.Population:PrintWhoDiagnostics()
     elseif command == "roster" then WC.Population.ChannelRoster:Scan(true)
+    elseif command == "roster on" or command == "roster off" then
+        WC.Population.ChannelRoster:SetEnabled(command == "roster on")
     elseif command:match("^who%s+") then
         local filter = (input or ""):match("^%s*%S+%s+(.+)%s*$")
         if filter and not census:TryChatQuery(filter) then WC.Population:Scan(filter) end
