@@ -139,6 +139,7 @@ boot:SetScript("OnEvent", function(_, event, addon)
         WC:InitDB()
         WC.Population:Init()
         WC.Population.Passive:Init()
+        WC.Population.ChannelRoster:Init()
         WC.UI:Init()
         WC:Print("Loaded. /wc opens the window.")
     elseif event == "PLAYER_LOGOUT" and WC.db then
@@ -156,6 +157,7 @@ SlashCmdList.WOWCENSUS = function(input)
     elseif command == "stop" then census:Stop()
     elseif command == "status" then census:Status()
     elseif command == "diag" then WC.Population:PrintWhoDiagnostics()
+    elseif command == "roster" then WC.Population.ChannelRoster:Scan(true)
     elseif command:match("^who%s+") then
         local filter = (input or ""):match("^%s*%S+%s+(.+)%s*$")
         if filter and not census:TryChatQuery(filter) then WC.Population:Scan(filter) end

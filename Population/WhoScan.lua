@@ -187,6 +187,10 @@ local function identity(info)
     return key, name .. "-" .. realm, name, realm, firstName, lastName
 end
 
+function Pop:CharacterIdentity(info)
+    return identity(info or {})
+end
+
 local GEAR_BUDGET = 5
 
 local DEFAULT_GEAR_SHARE = { Blacksmithing = 0.0390, Leatherworking = 0.0545, Tailoring = 0.0671 }
