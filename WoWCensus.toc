@@ -2,7 +2,7 @@
 ## Title: WoWCensus
 ## Notes: Census /who collection
 ## Author: wowcensus
-## Version: 0.1.12
+## Version: 0.1.13
 ## SavedVariables: WoWCensusDB
 ## OptionalDeps: Journalator, TradeSkillMaster, Auctionator
 ## X-Category: Data Collection

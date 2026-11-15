@@ -18,7 +18,7 @@ Just play. The add-on starts on its own when you log in, and moves forward a ste
 - If it asks for your region, type `/wc region us`. Use `eu`, `kr`, `tw` or `cn` if that's your region.
 - **Auto: On / Off** in the window pauses or resumes it. Right-clicking the minimap button does the same.
 - `/wc minimap` shows or hides the minimap button.
-- On Retail, the add-on also passively records names exposed by joined chat-channel rosters. Use `/wc roster` (or `/wcroster`) to scan immediately and print channel totals. Use `/wc roster off` or `/wc roster on` to control channel collection separately.
+- On Retail, the add-on also passively records names exposed by joined chat-channel rosters. Use `/wc roster` (or `/wcroster`) to read the currently available roster. Use `/wc roster all` (or `/wcroster all`) to manually select and scan each populated joined channel in sequence. Use `/wc roster off` or `/wc roster on` to control channel collection separately.
 
 ## Other add-on data (optional)
 

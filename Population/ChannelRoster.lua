@@ -65,7 +65,8 @@ local function rememberCharacter(seen, timestamp)
     for channel in pairs(seen.channels) do source.channels[channel] = timestamp end
 end
 
-function ChannelRoster:Scan(announce)
+function ChannelRoster:Scan(announce, onlyIndex)
+    if self.sweeping and not onlyIndex then return 0 end
     if not retailAvailable() then
         if announce then WC:Print("Channel roster collection is available on Retail only.") end
         return 0
@@ -74,13 +75,19 @@ function ChannelRoster:Scan(announce)
         if announce then WC:Print("Channel roster collection is off. Use |cffffff00/wc roster on|r to enable it.") end
         return 0
     end
+    if not onlyIndex and type(GetSelectedDisplayChannel) == "function" then
+        local selected = GetSelectedDisplayChannel()
+        if selected and selected > 0 then onlyIndex = selected end
+    end
 
     local timestamp = time()
     local discovered, stats, diagnostics = {}, {}, {}
     for displayIndex = 1, (GetNumDisplayChannels() or 0) do
         local channelName, isHeader, _, channelNumber, memberCount, active =
             GetChannelDisplayInfo(displayIndex)
-        if not isHeader and active and channelNumber and memberCount and memberCount > 0 then
+        if (not onlyIndex or displayIndex == onlyIndex)
+            and not isHeader and active and channelNumber
+            and memberCount and memberCount > 0 then
             local collected = 0
             for memberIndex = 1, memberCount do
                 local playerName, _, _, guid =
@@ -167,6 +174,109 @@ function ChannelRoster:Schedule(delay)
     end)
 end
 
+function ChannelRoster:ScanAll()
+    if not retailAvailable() then
+        WC:Print("Channel roster collection is available on Retail only.")
+        return
+    end
+    if not enabled() then
+        WC:Print("Channel roster collection is off. Use |cffffff00/wc roster on|r to enable it.")
+        return
+    end
+    if self.sweeping then
+        WC:Print("A channel roster sweep is already running.")
+        return
+    end
+    if type(GetSelectedDisplayChannel) ~= "function"
+        or type(SetSelectedDisplayChannel) ~= "function"
+        or not C_Timer or type(C_Timer.After) ~= "function" then
+        WC:Print("Channel selection API unavailable.")
+        return
+    end
+
+    local original = GetSelectedDisplayChannel()
+    local channels = {}
+    for displayIndex = 1, (GetNumDisplayChannels() or 0) do
+        local name, isHeader, _, channelNumber, memberCount, active =
+            GetChannelDisplayInfo(displayIndex)
+        if name and not isHeader and active and channelNumber
+            and memberCount and memberCount > 0 then
+            channels[#channels + 1] = {
+                index = displayIndex, name = name,
+                channelNumber = channelNumber, reported = memberCount,
+            }
+        end
+    end
+
+    if #channels == 0 then
+        WC:Print("No populated joined channels are available to scan.")
+        return
+    end
+
+    self.sweeping = true
+    self.scheduleGeneration = (self.scheduleGeneration or 0) + 1
+    local position, expectedSelection, total = 1, nil, 0
+
+    local function finish(message)
+        local current = GetSelectedDisplayChannel()
+        if expectedSelection and current == expectedSelection and original and original > 0 then
+            pcall(SetSelectedDisplayChannel, original)
+        end
+        ChannelRoster.sweeping = false
+        if message then WC:Print("%s", message) end
+        WC:Print("Channel sweep finished: %d discoveries across %d channel(s), before deduplication.",
+            total, position - 1)
+    end
+
+    local nextChannel
+    nextChannel = function()
+        local channel = channels[position]
+        if not channel then
+            finish()
+            return
+        end
+
+        if expectedSelection and GetSelectedDisplayChannel() ~= expectedSelection then
+            finish("Sweep stopped because the selected channel changed.")
+            return
+        end
+
+        local ok, selected = pcall(SetSelectedDisplayChannel, channel.index)
+        if not ok or selected == false then
+            finish(string.format("Could not select %s.", channel.name))
+            return
+        end
+        expectedSelection = channel.index
+        local attempts = 0
+
+        local function collect()
+            if GetSelectedDisplayChannel() ~= channel.index then
+                finish("Sweep stopped because the selected channel changed.")
+                return
+            end
+
+            attempts = attempts + 1
+            local found = ChannelRoster:Scan(false, channel.index)
+            if found == 0 and attempts < 3 then
+                C_Timer.After(1, collect)
+                return
+            end
+
+            total = total + found
+            WC:Print("%s: %d character(s)%s.", channel.name, found,
+                attempts > 1 and string.format(" after %d attempts", attempts) or "")
+            position = position + 1
+            C_Timer.After(0.5, nextChannel)
+        end
+
+        C_Timer.After(1.5, collect)
+    end
+
+    WC:Print("Scanning %d available channel(s). Do not change the selected channel until it finishes.",
+        #channels)
+    nextChannel()
+end
+
 function ChannelRoster:Init()
     if not retailAvailable() or self.initialized then return end
     self.initialized = true
@@ -199,4 +309,10 @@ function ChannelRoster:SetEnabled(on)
 end
 
 SLASH_WOWCENSUSROSTER1 = "/wcroster"
-SlashCmdList.WOWCENSUSROSTER = function() ChannelRoster:Scan(true) end
+SlashCmdList.WOWCENSUSROSTER = function(input)
+    if tostring(input or ""):lower():match("^%s*all%s*$") then
+        ChannelRoster:ScanAll()
+    else
+        ChannelRoster:Scan(true)
+    end
+end

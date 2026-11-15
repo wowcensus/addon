@@ -158,6 +158,7 @@ SlashCmdList.WOWCENSUS = function(input)
     elseif command == "status" then census:Status()
     elseif command == "diag" then WC.Population:PrintWhoDiagnostics()
     elseif command == "roster" then WC.Population.ChannelRoster:Scan(true)
+    elseif command == "roster all" then WC.Population.ChannelRoster:ScanAll()
     elseif command == "roster on" or command == "roster off" then
         WC.Population.ChannelRoster:SetEnabled(command == "roster on")
     elseif command:match("^who%s+") then
