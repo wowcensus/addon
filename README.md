@@ -20,6 +20,10 @@ Just play. The add-on starts on its own when you log in, and moves forward a ste
 - `/wc minimap` shows or hides the minimap button.
 - On Retail, the add-on also passively records names exposed by joined chat-channel rosters. Use `/wc roster` (or `/wcroster`) to read the currently available roster. Use `/wc roster all` (or `/wcroster all`) to manually select and scan each populated joined channel in sequence. Use `/wc roster off` or `/wc roster on` to control channel collection separately.
 
+## Leveling data
+
+WoWCensus automatically records level-ups for the character you are playing. It requests the game's `/played` counters for a login baseline when needed and after each level-up. SavedVariables store the character GUID, edition and realm, level, observation time, and any returned total and current-level playtime in seconds. The game can display its usual `/played` lines in chat when it answers. Leveling data comes from the game API and is collected independently of the optional other-add-on setting.
+
 ## Other add-on data (optional)
 
 WoWCensus can also copy what some popular add-ons already record about your own play, so wowcensus.io can show things like how long items take to sell. This is **off by default**. Turn it on with the **Collect other addon data** box in the window, or `/wc market on` (`/wc market off` turns it off again).

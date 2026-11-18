@@ -137,6 +137,7 @@ boot:SetScript("OnEvent", function(_, event, addon)
         WC:Fire("DB_READY")
     elseif event == "PLAYER_LOGIN" then
         WC:InitDB()
+        WC:InitLeveling()
         WC.Population:Init()
         WC.Population.Passive:Init()
         WC.Population.ChannelRoster:Init()
