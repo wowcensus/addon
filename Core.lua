@@ -140,6 +140,7 @@ boot:SetScript("OnEvent", function(_, event, addon)
         WC.Population:Init()
         WC.Population.Passive:Init()
         WC.Population.ChannelRoster:Init()
+        WC.Auction:Init()
         WC.UI:Init()
         WC:Print("Loaded. /wc opens the window.")
     elseif event == "PLAYER_LOGOUT" and WC.db then
@@ -175,6 +176,8 @@ SlashCmdList.WOWCENSUS = function(input)
         WC:Print("Start at login %s.", WC.db.settings.censusAutoStart and "on" or "off")
     elseif command == "market on" or command == "market off" then
         WC.Market:SetEnabled(command == "market on")
+    elseif command == "auction" or command == "ah" then
+        WC.Auction:Start()
     elseif command == "minimap" then
         local shown = WC.db.minimap and WC.db.minimap.hide
         WC:SetMinimapShown(shown and true or false)

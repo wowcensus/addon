@@ -2,7 +2,7 @@
 ## Title: WoWCensus
 ## Notes: Census /who collection
 ## Author: wowcensus
-## Version: 0.1.13
+## Version: 0.1.14
 ## SavedVariables: WoWCensusDB
 ## OptionalDeps: Journalator, TradeSkillMaster, Auctionator
 ## X-Category: Data Collection
@@ -20,5 +20,6 @@ Population/CensusProfiles.lua
 Population/Census.lua
 Population/Passive.lua
 Market.lua
+Auction.lua
 UI.lua
 MinimapButton.lua

@@ -33,6 +33,10 @@ When it's on, WoWCensus copies from whichever of these you have installed:
 
 Other players' names, mail subjects and mail text are never copied. Only the last 90 days are kept. If none of these add-ons are installed, nothing happens.
 
+## Auction House snapshots (optional)
+
+When the Auction House is open, a small **Census Scan** button appears on its window. Clicking it manually captures one compact Auction House snapshot for wowcensus.io. It never scans automatically and does not add market statistics or other Auction House UI. The full-scan cooldown on older clients still applies.
+
 ## Share your results
 
 To send your results to wowcensus.io automatically, install the [WoWCensus Companion](https://github.com/wowcensus/companion) app. Without it, the data stays on your computer.
