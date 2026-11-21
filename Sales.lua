@@ -47,7 +47,7 @@ local function itemIDFromLink(link)
 end
 
 function S:Enabled()
-    return WC.Market and WC.Market.Enabled and WC.Market:Enabled()
+    return WC.db ~= nil
 end
 
 function S:Log()

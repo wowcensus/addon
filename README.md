@@ -24,6 +24,10 @@ Just play. The add-on starts on its own when you log in, and moves forward a ste
 
 WoWCensus automatically records level-ups for the character you are playing. It requests the game's `/played` counters for a login baseline when needed and after each level-up. SavedVariables store the character GUID, edition and realm, level, observation time, and any returned total and current-level playtime in seconds. The game can display its usual `/played` lines in chat when it answers. Leveling data comes from the game API and is collected independently of the optional other-add-on setting.
 
+## Your auctions
+
+WoWCensus automatically records your own auctions: each listing you post (item, stack size, bid, buyout and duration), the game's "A buyer has been found" and "has expired" messages with the time they arrive, auctions you cancel, and the auction invoices in your mailbox, including the arrival time shown on a Sale Pending letter. That lets wowcensus.io work out when an item really sold, even if you were offline and opened your mail later. Buyers' names, mail subjects and mail text are never recorded, and only the last 90 days are kept. Like leveling data, this comes from the game itself and does not depend on the other-add-on setting.
+
 ## Other add-on data (optional)
 
 WoWCensus can also copy what some popular add-ons already record about your own play, so wowcensus.io can show things like how long items take to sell. This is **off by default**. Turn it on with the **Collect other addon data** box in the window, or `/wc market on` (`/wc market off` turns it off again).
@@ -35,9 +39,7 @@ When it's on, WoWCensus copies from whichever of these you have installed:
 - **Auctionator**: your posting history.
 - **Dungeon Journal**: everything it saves, such as dungeon runs, kills and the quest text it has learned.
 
-With the same setting on, WoWCensus also records your own auctions itself, with or without those add-ons: each listing you post (item, stack size, bid, buyout and duration), the game's "A buyer has been found" and "has expired" messages with the time they arrive, auctions you cancel, and the auction invoices in your mailbox, including the arrival time shown on a Sale Pending letter. That lets wowcensus.io work out when an item really sold, even if you were offline and opened your mail later.
-
-Other players' names, mail subjects and mail text are never copied or recorded. Only the last 90 days are kept.
+Other players' names, mail subjects and mail text are never copied. Only the last 90 days are kept. If none of these add-ons are installed, nothing happens.
 
 ## Auction House snapshots (optional)
 

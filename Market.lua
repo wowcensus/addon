@@ -318,9 +318,9 @@ function M:SetEnabled(on)
     if on then
         local found = self:Sources()
         if #found == 0 then
-            WC:Print("Addon data collection on. Your own auction listings, sales and auction mail are now recorded. Journalator, TradeSkillMaster, Auctionator and Dungeon Journal are not loaded, so there is nothing to copy from them.")
+            WC:Print("Addon data collection on. Journalator, TradeSkillMaster, Auctionator and Dungeon Journal are not loaded, so there is nothing to copy yet.")
         else
-            WC:Print("Addon data collection on. Recording your own auctions and copying from %s.", table.concat(found, ", "))
+            WC:Print("Addon data collection on. Copying from %s.", table.concat(found, ", "))
             self:Collect("toggle")
         end
     else
