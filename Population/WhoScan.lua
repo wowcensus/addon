@@ -22,7 +22,7 @@ function Pop:TraceWho(event, fields)
     entry.t = time()
     entry.region = ML:Region()
     entry.game = ML:GameFlavor()
-    entry.realm = GetRealmName and GetRealmName() or ""
+    entry.realm = ML:RealmName() or ""
     local events = store.whoEvents
     events[#events + 1] = entry
     while #events > WHO_EVENT_CAP do table.remove(events, 1) end
@@ -176,7 +176,7 @@ local function identity(info)
         name, realm = fullName:match("^([^-]+)%-(.+)$")
     end
     name = trim(name or fullName)
-    realm = trim(realm or GetRealmName() or "UnknownRealm")
+    realm = trim(realm or ML:RealmName() or "UnknownRealm")
     if firstName == "" then firstName, lastName = name:match("^(%S+)%s+(.+)$") end
     firstName = trim(firstName ~= "" and firstName or name)
     lastName = trim(lastName)
@@ -288,7 +288,7 @@ function Pop:Scan(filter, tag)
     self.systemMessages = 0
     store.whoDiagnostic = { filter = filter, attemptedAt = time(), status = "waiting",
         gapMs = gapMs, homeMs = homeMs, worldMs = worldMs,
-        region = ML:Region(), game = ML:GameFlavor(), realm = GetRealmName() }
+        region = ML:Region(), game = ML:GameFlavor(), realm = ML:RealmName() }
     self.pendingStarted = now
     self.pendingToken = (self.pendingToken or 0) + 1
     local token = self.pendingToken

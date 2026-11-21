@@ -37,8 +37,41 @@ end
 
 function WC:CensusPrint(format, ...) self:Debug(format, ...) end
 
+local function present(value)
+    return type(value) == "string" and value ~= "" and value or nil
+end
+
+local function playerServerID()
+    local guid = UnitGUID and UnitGUID("player")
+    return guid and tonumber(guid:match("^Player%-(%d+)%-")) or nil
+end
+
+local function savedRealm(identity, id, game, region)
+    if type(identity) ~= "table" or identity.realmID ~= id or not present(identity.realmName) then return nil end
+    if identity.game ~= game or identity.region ~= region then return nil end
+    return identity
+end
+
+function WC:RealmName()
+    local name = present(GetRealmName and GetRealmName())
+    local id = GetRealmID and GetRealmID() or nil
+    if name then return name, id, present(GetNormalizedRealmName and GetNormalizedRealmName()) end
+    local server = playerServerID()
+    if not server or not self.db then return nil end
+    local game, region = self:GameFlavor(), self:Region()
+    for _, source in ipairs({ self.db.realms or {}, self.db.leveling or {} }) do
+        for _, entry in pairs(source) do
+            local identity = savedRealm(type(entry) == "table" and entry.identity, server, game, region)
+            if identity then return identity.realmName, server, identity.realmNormalized end
+        end
+    end
+    return nil
+end
+
 function WC:RealmKey()
-    return self:Region() .. ":" .. self:GameFlavor() .. ":" .. (GetRealmName() or "UnknownRealm") .. "-" .. (UnitFactionGroup("player") or "Neutral")
+    local name = self:RealmName()
+    if not name then return nil end
+    return self:Region() .. ":" .. self:GameFlavor() .. ":" .. name .. "-" .. (UnitFactionGroup("player") or "Neutral")
 end
 
 function WC:Region()
@@ -58,12 +91,13 @@ function WC:Region()
 end
 
 function WC:RealmIdentity()
+    local name, id, normalized = self:RealmName()
     return {
         game = self:GameFlavor(), region = self:Region(),
         regionID = GetCurrentRegion and GetCurrentRegion() or nil,
-        realmID = GetRealmID and GetRealmID() or nil,
-        realmName = GetRealmName and GetRealmName() or nil,
-        realmNormalized = GetNormalizedRealmName and GetNormalizedRealmName() or nil,
+        realmID = name and id or nil,
+        realmName = name,
+        realmNormalized = normalized,
         faction = UnitFactionGroup and UnitFactionGroup("player") or nil,
     }
 end
@@ -120,19 +154,41 @@ function WC:InitDB()
         self.db.settings.censusPassiveConfigured = true
     end
     local key = self:RealmKey()
-    self.db.realms[key] = self.db.realms[key] or {}
-    self.realm = self.db.realms[key]
+    if key then
+        if self.realmPending and not self.db.realms[key] then self.db.realms[key] = self.realmPending end
+        self.realmPending = nil
+        self.db.realms[key] = self.db.realms[key] or {}
+        self.realm = self.db.realms[key]
+    else
+        self.realmPending = self.realmPending or {}
+        self.realm = self.realmPending
+    end
     self.realm.identity = self:RealmIdentity()
     self.Population:Store()
     if self.Population.RepairForeverKeys then self.Population:RepairForeverKeys() end
+end
+
+function WC:RefreshRealm()
+    if not self.db or not self:RealmName() then return end
+    if self.realmPending then self:InitDB() end
+    local identity = self:RealmIdentity()
+    local guid = UnitGUID and UnitGUID("player")
+    local character = guid and self.db.leveling and self.db.leveling[identity.game .. ":" .. guid]
+    if type(character) == "table" and not (type(character.identity) == "table" and present(character.identity.realmName)) then
+        character.identity = identity
+    end
+    if self.Sales and self.Sales.Refresh then self.Sales:Refresh() end
 end
 
 local boot = CreateFrame("Frame")
 boot:RegisterEvent("ADDON_LOADED")
 boot:RegisterEvent("PLAYER_LOGIN")
 boot:RegisterEvent("PLAYER_LOGOUT")
+boot:RegisterEvent("PLAYER_ENTERING_WORLD")
 boot:SetScript("OnEvent", function(_, event, addon)
-    if event == "ADDON_LOADED" and addon == ADDON then
+    if event == "PLAYER_ENTERING_WORLD" then
+        WC:RefreshRealm()
+    elseif event == "ADDON_LOADED" and addon == ADDON then
         WC:InitDB()
         WC:Fire("DB_READY")
     elseif event == "PLAYER_LOGIN" then
@@ -146,6 +202,7 @@ boot:SetScript("OnEvent", function(_, event, addon)
         WC.UI:Init()
         WC:Print("Loaded. /wc opens the window.")
     elseif event == "PLAYER_LOGOUT" and WC.db then
+        WC:RefreshRealm()
         if WC.Population.PackStorage then WC.Population:PackStorage() end
     end
 end)

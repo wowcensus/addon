@@ -267,7 +267,7 @@ function M:CollectDungeonJournal(m)
     end
     if type(character) == "table" then
         local name = UnitName and UnitName("player") or "Unknown"
-        local realm = GetRealmName and GetRealmName() or "Unknown"
+        local realm = WC:RealmName() or "Unknown"
         dj.characters[name .. "-" .. realm] = {
             t = time(), char = name, realm = realm,
             faction = UnitFactionGroup and UnitFactionGroup("player") or nil,

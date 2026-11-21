@@ -50,18 +50,32 @@ function S:Enabled()
     return WC.db ~= nil
 end
 
+local function hasRealm(entry)
+    return type(entry.realm) == "string" and entry.realm ~= ""
+end
+
+local function stamp(entry)
+    local realm = WC:RealmName()
+    if realm or not hasRealm(entry) then
+        entry.identity = WC:RealmIdentity()
+        entry.realm = realm
+    end
+    entry.char = UnitName and UnitName("player") or entry.char
+    entry.faction = UnitFactionGroup and UnitFactionGroup("player") or entry.faction
+end
+
+function S:Refresh()
+    if log and not hasRealm(log) then stamp(log) end
+end
+
 function S:Log()
     if log then return log end
     local guid = UnitGUID and UnitGUID("player")
     if not guid or not WC.db then return nil end
     WC.db.auctionLog = WC.db.auctionLog or {}
-    local identity = WC:RealmIdentity()
-    local key = identity.game .. ":" .. guid
+    local key = WC:GameFlavor() .. ":" .. guid
     local entry = WC.db.auctionLog[key] or { rows = {} }
-    entry.identity = identity
-    entry.char = UnitName and UnitName("player") or nil
-    entry.realm = GetRealmName and GetRealmName() or nil
-    entry.faction = UnitFactionGroup and UnitFactionGroup("player") or nil
+    stamp(entry)
     entry.rows = entry.rows or {}
     local latest = {}
     for _, row in pairs(entry.rows) do
@@ -79,6 +93,7 @@ function S:Add(row)
     if not self:Enabled() then return end
     local entry = self:Log()
     if not entry then return end
+    if not hasRealm(entry) then stamp(entry) end
     row.t = row.t or now()
     row.st = row.st or serverNow()
     local base = table.concat({ row.kind, tostring(row.t), tostring(row.name), tostring(row.count),
