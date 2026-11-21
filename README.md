@@ -35,7 +35,9 @@ When it's on, WoWCensus copies from whichever of these you have installed:
 - **Auctionator**: your posting history.
 - **Dungeon Journal**: everything it saves, such as dungeon runs, kills and the quest text it has learned.
 
-Other players' names, mail subjects and mail text are never copied. Only the last 90 days are kept. If none of these add-ons are installed, nothing happens.
+With the same setting on, WoWCensus also records your own auctions itself, with or without those add-ons: each listing you post (item, stack size, bid, buyout and duration), the game's "A buyer has been found" and "has expired" messages with the time they arrive, auctions you cancel, and the auction invoices in your mailbox, including the arrival time shown on a Sale Pending letter. That lets wowcensus.io work out when an item really sold, even if you were offline and opened your mail later.
+
+Other players' names, mail subjects and mail text are never copied or recorded. Only the last 90 days are kept.
 
 ## Auction House snapshots (optional)
 

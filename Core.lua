@@ -142,6 +142,7 @@ boot:SetScript("OnEvent", function(_, event, addon)
         WC.Population.Passive:Init()
         WC.Population.ChannelRoster:Init()
         WC.Auction:Init()
+        WC.Sales:Init()
         WC.UI:Init()
         WC:Print("Loaded. /wc opens the window.")
     elseif event == "PLAYER_LOGOUT" and WC.db then
