@@ -26,15 +26,23 @@ local function gameClock()
     end
 end
 
-local function pattern(format)
+local function pattern(format, loose)
     if type(format) ~= "string" then return nil end
     local escaped = format:gsub("([%(%)%.%%%+%-%*%?%[%]%^%$])", "%%%1")
     escaped = escaped:gsub("%%%%s", "(.+)"):gsub("%%%%d", "(%%d+)")
+    if loose then return escaped end
     return "^" .. escaped .. "$"
 end
 
 local SOLD = pattern(ERR_AUCTION_SOLD_S)
 local EXPIRED = pattern(ERR_AUCTION_EXPIRED_S)
+local SOLD_LINE = pattern(ERR_AUCTION_SOLD_S, true)
+local EXPIRED_LINE = pattern(ERR_AUCTION_EXPIRED_S, true)
+local NOTIFY_SOLD = Enum and Enum.AuctionHouseNotification and Enum.AuctionHouseNotification.AuctionSold or 4
+local NOTIFY_EXPIRED = Enum and Enum.AuctionHouseNotification and Enum.AuctionHouseNotification.AuctionExpired or 5
+local SAME_NOTICE_SECONDS = 2
+local recentNotices = {}
+local chatSeen = {}
 
 local function modern()
     if not (C_AuctionHouse and C_AuctionHouse.PostItem) then return false end
@@ -259,6 +267,47 @@ function S:ScanMail()
     end
 end
 
+local function clock()
+    return GetTime and GetTime() or now()
+end
+
+local function plainName(text)
+    if type(text) ~= "string" then return nil end
+    text = text:gsub("|c%x%x%x%x%x%x%x%x", ""):gsub("|r", "")
+    text = text:match("|h%[(.-)%]|h") or text:match("^%[(.-)%]$") or text
+    if text == "" then return nil end
+    return text
+end
+
+local function postedName(auctionID)
+    if not (auctionID and log) then return nil end
+    for _, row in pairs(log.rows) do
+        if row.kind == "post" and row.auctionID == auctionID and row.name then return row.name end
+    end
+end
+
+local function notice(kind, name, auctionID, via)
+    name = plainName(name) or postedName(auctionID)
+    if not name then return end
+    local at = clock()
+    for i = #recentNotices, 1, -1 do
+        local seen = recentNotices[i]
+        if at - seen.at > SAME_NOTICE_SECONDS then
+            table.remove(recentNotices, i)
+        elseif seen.kind == kind and seen.name == name and not seen.via[via]
+            and (not auctionID or not seen.row.auctionID or seen.row.auctionID == auctionID) then
+            seen.via[via] = true
+            if auctionID and not seen.row.auctionID then seen.row.auctionID = auctionID end
+            seen.row.via = seen.row.via .. "," .. via
+            return
+        end
+    end
+    local row = { kind = kind, name = name, auctionID = auctionID, via = via }
+    if S:Add(row) then
+        recentNotices[#recentNotices + 1] = { kind = kind, name = name, at = at, via = { [via] = true }, row = row }
+    end
+end
+
 local function onSystem(message)
     if type(message) ~= "string" then return end
     if message == ERR_AUCTION_STARTED and not modern() then
@@ -267,12 +316,39 @@ local function onSystem(message)
     end
     local name = SOLD and message:match(SOLD)
     if name then
-        S:Add({ kind = "sold", name = name })
+        notice("sold", name, nil, "system")
         return
     end
     name = EXPIRED and message:match(EXPIRED)
     if name then
-        S:Add({ kind = "expired", name = name })
+        notice("expired", name, nil, "system")
+    end
+end
+
+local function onNotification(kind, text, auctionID)
+    if kind == NOTIFY_SOLD then
+        notice("sold", text, tonumber(auctionID), "notify")
+    elseif kind == NOTIFY_EXPIRED then
+        notice("expired", text, tonumber(auctionID), "notify")
+    end
+end
+
+local function onChatLine(_, message)
+    if type(message) ~= "string" then return end
+    local line = message:gsub("|c%x%x%x%x%x%x%x%x", ""):gsub("|r", "")
+    local kind, name = "sold", SOLD_LINE and line:match(SOLD_LINE)
+    if not name then kind, name = "expired", EXPIRED_LINE and line:match(EXPIRED_LINE) end
+    if not name then return end
+    local at = clock()
+    if chatSeen.line == message and chatSeen.at == at then return end
+    chatSeen.line, chatSeen.at = message, at
+    notice(kind, name, nil, "chat")
+end
+
+local function hookChat()
+    for i = 1, NUM_CHAT_WINDOWS or 10 do
+        local frame = _G["ChatFrame" .. i]
+        if frame and frame.AddMessage then hooksecurefunc(frame, "AddMessage", onChatLine) end
     end
 end
 
@@ -298,7 +374,10 @@ function S:Init()
     if self.hooked then return end
     self.hooked = true
     hook()
+    hookChat()
     register("CHAT_MSG_SYSTEM")
+    register("AUCTION_HOUSE_SHOW_FORMATTED_NOTIFICATION")
+    register("AUCTION_HOUSE_SHOW_NOTIFICATION")
     register("MAIL_INBOX_UPDATE")
     register("AUCTION_HOUSE_CLOSED")
     if modern() then
@@ -310,9 +389,13 @@ function S:Init()
     end
 end
 
-events:SetScript("OnEvent", function(_, event, arg1, arg2)
+events:SetScript("OnEvent", function(_, event, arg1, arg2, arg3)
     if event == "CHAT_MSG_SYSTEM" then
         onSystem(arg1)
+    elseif event == "AUCTION_HOUSE_SHOW_FORMATTED_NOTIFICATION" then
+        onNotification(arg1, arg2, arg3)
+    elseif event == "AUCTION_HOUSE_SHOW_NOTIFICATION" then
+        onNotification(arg1, arg2)
     elseif event == "MAIL_INBOX_UPDATE" then
         S:ScanMail()
     elseif event == "NEW_AUCTION_UPDATE" then
