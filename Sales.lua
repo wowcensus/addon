@@ -38,6 +38,9 @@ local SOLD = pattern(ERR_AUCTION_SOLD_S)
 local EXPIRED = pattern(ERR_AUCTION_EXPIRED_S)
 local SOLD_LINE = pattern(ERR_AUCTION_SOLD_S, true)
 local EXPIRED_LINE = pattern(ERR_AUCTION_EXPIRED_S, true)
+local EXPIRED_MAIL = pattern(AUCTION_EXPIRED_MAIL_SUBJECT)
+local EXPIRED_MAIL_DAYS = 30
+local EXPIRED_MATCH_SECONDS = 600
 local NOTIFY_SOLD = Enum and Enum.AuctionHouseNotification and Enum.AuctionHouseNotification.AuctionSold or 4
 local NOTIFY_EXPIRED = Enum and Enum.AuctionHouseNotification and Enum.AuctionHouseNotification.AuctionExpired or 5
 local SAME_NOTICE_SECONDS = 2
@@ -245,6 +248,7 @@ function S:ScanMail()
     local entry = self:Log()
     if not entry then return end
     local hour, minute = gameClock()
+    local claimed = {}
     for index = 1, (GetInboxNumItems()) or 0 do
         local invoiceType, itemName, _, bid, buyout, deposit, consignment, moneyDelay, etaHour, etaMin, count =
             GetInboxInvoiceInfo(index)
@@ -263,8 +267,57 @@ function S:ScanMail()
                     moneyDelay = tonumber(moneyDelay), etaHour = tonumber(etaHour), etaMin = tonumber(etaMin),
                     daysLeft = daysLeft, expires = expires, gameHour = hour, gameMinute = minute, t = t })
             end
+        else
+            self:ScanExpiredMail(entry, index, claimed)
         end
     end
+end
+
+local function mailItem(index)
+    local itemID = type(GetInboxItemLink) == "function" and itemIDFromLink(GetInboxItemLink(index, 1)) or nil
+    if type(GetInboxItem) ~= "function" then return itemID, nil end
+    local ok, _, second, third, fourth = pcall(GetInboxItem, index, 1)
+    if not ok then return itemID, nil end
+    if tonumber(second) and itemID and tonumber(second) == itemID then return itemID, tonumber(fourth) end
+    if not itemID and tonumber(second) and tonumber(fourth) then return tonumber(second), tonumber(fourth) end
+    return itemID, tonumber(third)
+end
+
+function S:ScanExpiredMail(entry, index, claimed)
+    if not EXPIRED_MAIL or type(GetInboxHeaderInfo) ~= "function" then return end
+    local _, _, _, subject, _, _, daysLeft, hasItem = GetInboxHeaderInfo(index)
+    local name = type(subject) == "string" and subject:match(EXPIRED_MAIL)
+    daysLeft = tonumber(daysLeft)
+    if not name or not daysLeft then return end
+    local itemID, count
+    if hasItem then itemID, count = mailItem(index) end
+    count = count or 1
+    local t = now()
+    local expires = math.floor(t + daysLeft * 86400)
+    local sent = math.floor(t - math.max(0, EXPIRED_MAIL_DAYS - daysLeft) * 86400)
+    local base = table.concat({ "expired", name, tostring(count) }, "|")
+    for _, row in pairs(entry.rows) do
+        if row.kind == "expired" and row.base == base and not claimed[row]
+            and math.abs((row.expires or 0) - expires) <= MAIL_MATCH_SECONDS then
+            claimed[row] = true
+            return
+        end
+    end
+    for _, row in pairs(entry.rows) do
+        if row.kind == "expired" and not row.base and not claimed[row] and row.name == name
+            and math.abs((row.t or 0) - sent) <= EXPIRED_MATCH_SECONDS then
+            claimed[row] = true
+            row.base, row.expires, row.daysLeft = base, expires, daysLeft
+            row.itemID = row.itemID or itemID
+            row.count = row.count or count
+            row.via = row.via and (row.via .. ",mail") or "mail"
+            WC:Fire("SALES_CHANGED")
+            return
+        end
+    end
+    local key = self:Add({ kind = "expired", name = name, itemID = itemID, count = count, via = "mail",
+        base = base, expires = expires, daysLeft = daysLeft, t = sent })
+    if key then claimed[entry.rows[key]] = true end
 end
 
 local function clock()

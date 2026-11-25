@@ -26,7 +26,7 @@ WoWCensus automatically records level-ups for the character you are playing. It 
 
 ## Your auctions
 
-WoWCensus automatically records your own auctions: each listing you post (item, stack size, bid, buyout and duration), the game's "A buyer has been found" and "has expired" messages with the time they arrive, auctions you cancel, and the auction invoices in your mailbox, including the arrival time shown on a Sale Pending letter. That lets wowcensus.io work out when an item really sold, even if you were offline and opened your mail later. Buyers' names, mail subjects and mail text are never recorded, and only the last 90 days are kept. Like leveling data, this comes from the game itself and does not depend on the other-add-on setting.
+WoWCensus automatically records your own auctions: each listing you post (item, stack size, bid, buyout and duration), the game's "A buyer has been found" and "has expired" messages with the time they arrive, auctions you cancel, the auction invoices in your mailbox, including the arrival time shown on a Sale Pending letter, and the items returned in "Auction expired" letters, so auctions that run out while you're offline are counted too. That lets wowcensus.io work out when an item really sold, even if you were offline and opened your mail later. Buyers' names, mail subjects and mail text are never recorded, and only the last 90 days are kept. Like leveling data, this comes from the game itself and does not depend on the other-add-on setting.
 
 ## Other add-on data (optional)
 
