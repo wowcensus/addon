@@ -156,12 +156,20 @@ function WC:InitDB()
     local key = self:RealmKey()
     if key then
         if self.realmPending and not self.db.realms[key] then self.db.realms[key] = self.realmPending end
-        self.realmPending = nil
+        self.realmPending, self.realmFallback = nil, nil
         self.db.realms[key] = self.db.realms[key] or {}
         self.realm = self.db.realms[key]
     else
-        self.realmPending = self.realmPending or {}
-        self.realm = self.realmPending
+        local faction = UnitFactionGroup and UnitFactionGroup("player")
+        if faction then
+            key = self:Region() .. ":" .. self:GameFlavor() .. ":-" .. faction
+            self.db.realms[key] = self.db.realms[key] or self.realmPending or {}
+            self.realmPending, self.realmFallback = nil, key
+            self.realm = self.db.realms[key]
+        else
+            self.realmPending = self.realmPending or {}
+            self.realm = self.realmPending
+        end
     end
     self.realm.identity = self:RealmIdentity()
     self.Population:Store()
@@ -170,7 +178,7 @@ end
 
 function WC:RefreshRealm()
     if not self.db or not self:RealmName() then return end
-    if self.realmPending then self:InitDB() end
+    if self.realmPending or self.realmFallback then self:InitDB() end
     local identity = self:RealmIdentity()
     local guid = UnitGUID and UnitGUID("player")
     local character = guid and self.db.leveling and self.db.leveling[identity.game .. ":" .. guid]
