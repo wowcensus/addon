@@ -61,8 +61,14 @@ local function add(items, itemID, name, link, quantity, auctions, price)
     return true
 end
 
+local compactButton = false
+
 local function setButtonText(text)
-    if button then button:SetText(text) end
+    if not button then return end
+    if compactButton then
+        text = (text == "Census Scan") and "Scan" or "Scanning..."
+    end
+    button:SetText(text)
 end
 
 function A:AtAuctionHouse()
@@ -86,11 +92,22 @@ function A:AttachButton()
             GameTooltip:Show()
         end)
         button:SetScript("OnLeave", function() GameTooltip:Hide() end)
-    else
-        button:SetParent(parent)
     end
     button:ClearAllPoints()
-    button:SetPoint("TOPRIGHT", parent, "TOPRIGHT", -38, -30)
+    local bar = parent == AuctionHouseFrame and parent.SearchBar
+    local filter = bar and bar.FilterButton
+    if filter then
+        compactButton = true
+        button:SetParent(bar)
+        button:SetSize(84, 22)
+        button:SetPoint("RIGHT", filter, "LEFT", -14, 0)
+        button:SetFrameLevel(filter:GetFrameLevel() + 2)
+    else
+        compactButton = false
+        button:SetParent(parent)
+        button:SetSize(112, 22)
+        button:SetPoint("TOPRIGHT", parent, "TOPRIGHT", -38, -30)
+    end
     button:Show()
     setButtonText(self.scanning and "Scanning..." or "Census Scan")
 end
